@@ -14,6 +14,7 @@ INPUT_CANDIDATES = [
 ]
 OUTPUT_TABLE_C_MD = (SCRIPT_DIR / '../table_c.md').resolve()
 OUTPUT_TABLE_MD = (SCRIPT_DIR / '../table.md').resolve()
+CHAPTER_SONG_ORDER_FILE = SCRIPT_DIR / 'chapter-song-order.json'
 CURRENT_VERSION = '6.0'
 
 DIFFICULTY_ORDER = ['Drizzle', 'Sprinkle', 'Cloudburst', 'Clear', 'Special']
@@ -129,6 +130,20 @@ def chart_title_link(title: str, difficulty: str) -> str:
 def chart_constant_link(title: str, difficulty: str, constant: Any) -> str:
     constant_text = format_constant(constant) or '?'
     return f'[{constant_text}]({info_string(title, difficulty)})'
+
+
+def load_chapter_song_order() -> dict[str, list[str]]:
+    if not CHAPTER_SONG_ORDER_FILE.exists():
+        return {}
+    with CHAPTER_SONG_ORDER_FILE.open('r', encoding='utf-8') as file:
+        data = json.load(file)
+    if not isinstance(data, dict):
+        raise TypeError('chapter-song-order.json 顶层必须是对象。')
+    return {
+        str(chapter): [str(title) for title in titles]
+        for chapter, titles in data.items()
+        if isinstance(titles, list)
+    }
 
 
 def get_chart_constant(chart: dict[str, Any]) -> Any:
@@ -331,7 +346,11 @@ def theoretical_reality_text(resources: dict[str, Any]) -> tuple[str, str, list[
     return f'{average:.3f}', round_half_up(average, 2), top20
 
 
-def build_chapter_markdown(resources: dict[str, Any], rows: list[dict[str, Any]]) -> str:
+def build_chapter_markdown(
+    resources: dict[str, Any],
+    rows: list[dict[str, Any]],
+    chapter_song_order: dict[str, list[str]],
+) -> str:
     ordered_sections, extras = build_chapter_order(resources)
     theory_raw, theory_display, top20 = theoretical_reality_text(resources)
 
@@ -396,11 +415,15 @@ def build_chapter_markdown(resources: dict[str, Any], rows: list[dict[str, Any]]
             '|---|---|---|---|---|---|',
         ])
 
-        for title, song in resources.items():
-            if not isinstance(song, dict):
-                continue
-            if str(song.get('chapter') or '').strip() != chapter_key:
-                continue
+        chapter_songs = [
+            (index, title, song)
+            for index, (title, song) in enumerate(resources.items())
+            if isinstance(song, dict) and str(song.get('chapter') or '').strip() == chapter_key
+        ]
+        order = {title: index for index, title in enumerate(chapter_song_order.get(chapter_key, []))}
+        chapter_songs.sort(key=lambda item: (order.get(item[1], len(order)), item[0]))
+
+        for _, title, song in chapter_songs:
 
             difficulties = song.get('difficulty', {})
             if not isinstance(difficulties, dict):
@@ -429,8 +452,9 @@ def main() -> None:
         raise TypeError('resources.json 顶层必须是对象。')
 
     rows = build_rows(resources)
+    chapter_song_order = load_chapter_song_order()
     constant_markdown = build_constant_markdown(rows)
-    chapter_markdown = build_chapter_markdown(resources, rows)
+    chapter_markdown = build_chapter_markdown(resources, rows, chapter_song_order)
 
     OUTPUT_TABLE_C_MD.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_TABLE_MD.parent.mkdir(parents=True, exist_ok=True)

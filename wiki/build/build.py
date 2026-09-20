@@ -30,6 +30,7 @@ from routes import song_base
 from collate import song_sort_key
 
 RESOURCES = REPO / "resources" / "resources.json"
+CHAPTER_SONG_ORDER_FILE = ROOT / "code" / "chapter-song-order.json"
 
 # 静态页面路由：route -> (title, md文件)
 PAGES: list[dict[str, Any]] = [
@@ -145,6 +146,9 @@ def build_song_list() -> list[dict[str, Any]]:
     with RESOURCES.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
+    with CHAPTER_SONG_ORDER_FILE.open("r", encoding="utf-8") as f:
+        chapter_song_order = json.load(f)
+
     song_dir = ROOT / "song"
     bases = {p.stem for p in song_dir.glob("*.md")} if song_dir.exists() else set()
 
@@ -161,7 +165,7 @@ def build_song_list() -> list[dict[str, Any]]:
         if base is None:
             print("!! 未找到曲目 md 文件:", key, latin, file=sys.stderr)
             continue
-        songs.append({"label": label, "name": key, "route": f"/song/{base}",
+        songs.append({"label": label, "name": key, "chapterId": str(song.get("chapter") or ""), "route": f"/song/{base}",
                       "file": f"song/{base}.md", "chapter": chapter,
                       "artist": song.get("artist", ""),
                       "latinTitle": latin,
@@ -175,9 +179,22 @@ def build_song_list() -> list[dict[str, Any]]:
     for i, s in enumerate(sorted(songs, key=lambda s: s["sortKey"])):
         s["sortIndex"] = i
 
-    # 章节按指定顺序排列，未列出的排最后；章内按统一排序键
+    # 章节按指定顺序排列，未列出的排最后；章内按存档顺序排列
     order = {c: i for i, c in enumerate(CHAPTER_ORDER)}
-    songs.sort(key=lambda s: (order.get(s["chapter"], len(CHAPTER_ORDER)), s["chapter"], s["sortKey"]))
+    chapter_ranks = {
+        chapter: {name: index for index, name in enumerate(names)}
+        for chapter, names in chapter_song_order.items()
+    }
+    songs.sort(key=lambda s: (
+        order.get(s["chapter"], len(CHAPTER_ORDER)),
+        s["chapter"],
+        chapter_ranks.get(s.get("chapterId", ""), {}).get(
+            s["name"], len(chapter_ranks.get(s.get("chapterId", ""), {}))
+        ),
+        s["sortKey"],
+    ))
+    for song in songs:
+        song.pop("chapterId", None)
     return songs
 
 

@@ -35,7 +35,7 @@
 
 ## 游戏相关
 
-- 与《[1.0](info:info("Welcome to Milthm", "Drizzle"))》相同，该曲目为 Milthm 的进阶教程曲，为学习雨丝音符的「[水面反射](https://milthm.com/wiki/hans/manual/judgment/water-reflected)」而制作。
+- 与《[Welcome to Milthm](info:info("Welcome to Milthm", "Drizzle"))》相同，该曲目为 Milthm 的进阶教程曲，为学习雨丝音符的「[水面反射](https://milthm.com/wiki/hans/manual/judgment/water-reflected)」而制作。
 
 ## 谱面预览
 
